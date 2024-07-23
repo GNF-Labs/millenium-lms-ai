@@ -1,2 +1,2 @@
 # millenium-lms-ai
-AI Development for Millenium  LMS App
+Pengembangan AI untuk Aplikasi LMS Millenium
