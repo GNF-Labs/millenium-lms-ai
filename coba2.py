@@ -8,20 +8,6 @@ from library_data import *
 import library_models as lib
 from library_models import *
 
-def select_free_gpu():
-    if not torch.cuda.is_available():
-        raise RuntimeError("No GPU available.")
-
-    # Get GPU memory usage
-    mem = [torch.cuda.memory_allocated(i) for i in range(torch.cuda.device_count())]
-
-    # Check if mem list is empty
-    if not mem:
-        raise RuntimeError("No GPUs detected.")
-
-    # Return the index of the GPU with the least memory usage
-    return str(mem.index(min(mem)))
-
 def train_jodie_model(network, model_name="jodie", epochs=1, gpu=-1, embedding_dim=128,
                       train_proportion=0.8, state_change=True):
     # INITIALIZE PARAMETERS
@@ -39,11 +25,6 @@ def train_jodie_model(network, model_name="jodie", epochs=1, gpu=-1, embedding_d
   if args.train_proportion > 0.8:
       sys.exit('Training sequence proportion cannot be greater than 0.8.')
 
-  # SET GPU
-  if args.gpu == -1:
-      args.gpu = select_free_gpu()
-  os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-  os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
   # LOAD DATA
   [user2id, user_sequence_id, user_timediffs_sequence, user_previous_itemid_sequence,
@@ -73,21 +54,21 @@ def train_jodie_model(network, model_name="jodie", epochs=1, gpu=-1, embedding_d
   tbatch_timespan = timespan / 500
 
   # INITIALIZE MODEL AND PARAMETERS
-  model = JODIE(args, num_features, num_users, num_items).cuda()
-  weight = torch.Tensor([1,true_labels_ratio]).cuda()
+  model = JODIE(args, num_features, num_users, num_items)
+  weight = torch.Tensor([1,true_labels_ratio])
   crossEntropyLoss = nn.CrossEntropyLoss(weight=weight)
   MSELoss = nn.MSELoss()
 
   # INITIALIZE EMBEDDING
-  initial_user_embedding = nn.Parameter(F.normalize(torch.rand(args.embedding_dim).cuda(), dim=0)) # the initial user and item embeddings are learned during training as well
-  initial_item_embedding = nn.Parameter(F.normalize(torch.rand(args.embedding_dim).cuda(), dim=0))
+  initial_user_embedding = nn.Parameter(F.normalize(torch.rand(args.embedding_dim), dim=0)) # the initial user and item embeddings are learned during training as well
+  initial_item_embedding = nn.Parameter(F.normalize(torch.rand(args.embedding_dim), dim=0))
   model.initial_user_embedding = initial_user_embedding
   model.initial_item_embedding = initial_item_embedding
 
   user_embeddings = initial_user_embedding.repeat(num_users, 1) # initialize all users to the same embedding
   item_embeddings = initial_item_embedding.repeat(num_items, 1) # initialize all items to the same embedding
-  item_embedding_static = Variable(torch.eye(num_items).cuda()) # one-hot vectors for static embeddings
-  user_embedding_static = Variable(torch.eye(num_users).cuda()) # one-hot vectors for static embeddings
+  item_embedding_static = Variable(torch.eye(num_items)) # one-hot vectors for static embeddings
+  user_embedding_static = Variable(torch.eye(num_users)) # one-hot vectors for static embeddings
 
   # INITIALIZE MODEL
   learning_rate = 1e-3
@@ -115,8 +96,8 @@ def train_jodie_model(network, model_name="jodie", epochs=1, gpu=-1, embedding_d
 
           epoch_start_time = time.time()
           # INITIALIZE EMBEDDING TRAJECTORY STORAGE
-          user_embeddings_timeseries = Variable(torch.Tensor(num_interactions, args.embedding_dim).cuda())
-          item_embeddings_timeseries = Variable(torch.Tensor(num_interactions, args.embedding_dim).cuda())
+          user_embeddings_timeseries = Variable(torch.Tensor(num_interactions, args.embedding_dim))
+          item_embeddings_timeseries = Variable(torch.Tensor(num_interactions, args.embedding_dim))
 
           optimizer.zero_grad()
           reinitialize_tbatches()
@@ -179,14 +160,14 @@ def train_jodie_model(network, model_name="jodie", epochs=1, gpu=-1, embedding_d
 
                               # LOAD THE CURRENT TBATCH
                               if is_first_epoch:
-                                  lib.current_tbatches_user[i] = torch.LongTensor(lib.current_tbatches_user[i]).cuda()
-                                  lib.current_tbatches_item[i] = torch.LongTensor(lib.current_tbatches_item[i]).cuda()
-                                  lib.current_tbatches_interactionids[i] = torch.LongTensor(lib.current_tbatches_interactionids[i]).cuda()
-                                  lib.current_tbatches_feature[i] = torch.Tensor(lib.current_tbatches_feature[i]).cuda()
+                                  lib.current_tbatches_user[i] = torch.LongTensor(lib.current_tbatches_user[i])
+                                  lib.current_tbatches_item[i] = torch.LongTensor(lib.current_tbatches_item[i])
+                                  lib.current_tbatches_interactionids[i] = torch.LongTensor(lib.current_tbatches_interactionids[i])
+                                  lib.current_tbatches_feature[i] = torch.Tensor(lib.current_tbatches_feature[i])
 
-                                  lib.current_tbatches_user_timediffs[i] = torch.Tensor(lib.current_tbatches_user_timediffs[i]).cuda()
-                                  lib.current_tbatches_item_timediffs[i] = torch.Tensor(lib.current_tbatches_item_timediffs[i]).cuda()
-                                  lib.current_tbatches_previous_item[i] = torch.LongTensor(lib.current_tbatches_previous_item[i]).cuda()
+                                  lib.current_tbatches_user_timediffs[i] = torch.Tensor(lib.current_tbatches_user_timediffs[i])
+                                  lib.current_tbatches_item_timediffs[i] = torch.Tensor(lib.current_tbatches_item_timediffs[i])
+                                  lib.current_tbatches_previous_item[i] = torch.LongTensor(lib.current_tbatches_previous_item[i])
 
                               tbatch_userids = lib.current_tbatches_user[i] # Recall "lib.current_tbatches_user[i]" has unique elements
                               tbatch_itemids = lib.current_tbatches_item[i] # Recall "lib.current_tbatches_item[i]" has unique elements

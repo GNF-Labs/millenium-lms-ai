@@ -15,7 +15,6 @@ import math, random
 import sys
 from collections import defaultdict
 import os
-import gpustat
 from itertools import chain
 from tqdm import tqdm, trange, tqdm_notebook, tnrange
 import csv
@@ -44,7 +43,7 @@ class NormalLinear(nn.Linear):
 # THE JODIE MODULE
 class JODIE(nn.Module):
     def __init__(self, args, num_features, num_users, num_items):
-        super(JODIE,self).__init__()
+        super(JODIE, self).__init__()
 
         print("*** Initializing the JODIE model ***")
         self.modelname = args.model
@@ -84,7 +83,6 @@ class JODIE(nn.Module):
 
         elif select == 'project':
             user_projected_embedding = self.context_convert(user_embeddings, timediffs, features)
-            #user_projected_embedding = torch.cat([input3, item_embeddings], dim=1)
             return user_projected_embedding
 
     def context_convert(self, embeddings, timediffs, features):
@@ -125,14 +123,14 @@ def reinitialize_tbatches():
     tbatchid_item = defaultdict(lambda: -1)
 
     global total_reinitialization_count
-    total_reinitialization_count +=1
+    total_reinitialization_count += 1
 
 
 # CALCULATE LOSS FOR THE PREDICTED USER STATE
 def calculate_state_prediction_loss(model, tbatch_interactionids, user_embeddings_time_series, y_true, loss_function):
-    # PREDCIT THE LABEL FROM THE USER DYNAMIC EMBEDDINGS
-    prob = model.predict_label(user_embeddings_time_series[tbatch_interactionids,:])
-    y = Variable(torch.LongTensor(y_true).cuda()[tbatch_interactionids])
+    # PREDICT THE LABEL FROM THE USER DYNAMIC EMBEDDINGS
+    prob = model.predict_label(user_embeddings_time_series[tbatch_interactionids, :])
+    y = Variable(torch.LongTensor(y_true)[tbatch_interactionids])  # Removed .cuda()
 
     loss = loss_function(prob, y)
 
@@ -143,17 +141,17 @@ def calculate_state_prediction_loss(model, tbatch_interactionids, user_embedding
 def save_model(model, optimizer, args, epoch, user_embeddings, item_embeddings, train_end_idx, user_embeddings_time_series=None, item_embeddings_time_series=None, path=PATH):
     print("*** Saving embeddings and model ***")
     state = {
-            'user_embeddings': user_embeddings.data.cpu().numpy(),
-            'item_embeddings': item_embeddings.data.cpu().numpy(),
-            'epoch': epoch,
-            'state_dict': model.state_dict(),
-            'optimizer' : optimizer.state_dict(),
-            'train_end_idx': train_end_idx
-            }
+        'user_embeddings': user_embeddings.data.numpy(),  # Removed .cpu()
+        'item_embeddings': item_embeddings.data.numpy(),  # Removed .cpu()
+        'epoch': epoch,
+        'state_dict': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'train_end_idx': train_end_idx
+    }
 
     if user_embeddings_time_series is not None:
-        state['user_embeddings_time_series'] = user_embeddings_time_series.data.cpu().numpy()
-        state['item_embeddings_time_series'] = item_embeddings_time_series.data.cpu().numpy()
+        state['user_embeddings_time_series'] = user_embeddings_time_series.data.numpy()  # Removed .cpu()
+        state['item_embeddings_time_series'] = item_embeddings_time_series.data.numpy()  # Removed .cpu()
 
     directory = os.path.join(path, 'saved_models/%s' % args.network)
     if not os.path.exists(directory):
@@ -171,21 +169,21 @@ def load_model(model, optimizer, args, epoch):
     checkpoint = torch.load(filename)
     print("Loading saved embeddings and model: %s" % filename)
     args.start_epoch = checkpoint['epoch']
-    user_embeddings = Variable(torch.from_numpy(checkpoint['user_embeddings']).cuda())
-    item_embeddings = Variable(torch.from_numpy(checkpoint['item_embeddings']).cuda())
+    user_embeddings = Variable(torch.from_numpy(checkpoint['user_embeddings']))  # Removed .cuda()
+    item_embeddings = Variable(torch.from_numpy(checkpoint['item_embeddings']))  # Removed .cuda()
     try:
         train_end_idx = checkpoint['train_end_idx']
     except KeyError:
         train_end_idx = None
 
     try:
-        user_embeddings_time_series = Variable(torch.from_numpy(checkpoint['user_embeddings_time_series']).cuda())
-        item_embeddings_time_series = Variable(torch.from_numpy(checkpoint['item_embeddings_time_series']).cuda())
+        user_embeddings_time_series = Variable(torch.from_numpy(checkpoint['user_embeddings_time_series']))  # Removed .cuda()
+        item_embeddings_time_series = Variable(torch.from_numpy(checkpoint['item_embeddings_time_series']))  # Removed .cuda()
     except:
         user_embeddings_time_series = None
         item_embeddings_time_series = None
 
-    model.load_state_dict(checkpoint['state_dict'], strict = False)
+    model.load_state_dict(checkpoint['state_dict'], strict=False)
     optimizer.load_state_dict(checkpoint['optimizer'])
 
     return [model, optimizer, user_embeddings, item_embeddings, user_embeddings_time_series, item_embeddings_time_series, train_end_idx]
@@ -213,11 +211,11 @@ def set_embeddings_training_end(user_embeddings, item_embeddings, user_embedding
     item_embeddings.detach_()
 
 
-# SELECT THE GPU WITH MOST FREE MEMORY TO SCHEDULE JOB
+# SELECT THE GPU WITH MOST FREE MEMORY TO SCHEDULE TENSOR ALLOCATIONS
 def select_free_gpu():
-    mem = []
-    gpus = list(set(range(torch.cuda.device_count()))) # list(set(X)) is done to shuffle the array
-    for i in gpus:
-        gpu_stats = gpustat.GPUStatCollection.new_query()
-        mem.append(gpu_stats.jsonify()["gpus"][i]["memory.used"])
-    return str(gpus[np.argmin(mem)])
+    # Dummy function for non-GPU environment
+    return None
+
+
+if __name__ == "__main__":
+    pass
